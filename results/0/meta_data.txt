@@ -1,2 +1,0 @@
-n_embd = 256
-train_epochs = 100

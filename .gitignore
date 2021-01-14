@@ -1,3 +1,5 @@
+results/
+*.pt
 *.pkl
 *.bak
 */__pycache__/*
