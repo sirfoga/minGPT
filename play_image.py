@@ -1,31 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
-
-
-get_ipython().run_line_magic('load_ext', 'autoreload')
-get_ipython().run_line_magic('reload_ext', 'autoreload')
-get_ipython().run_line_magic('autoreload', '2')
-
-
-# In[9]:
-
 
 import numpy as np
 import torchvision
 import torch
 import matplotlib.pyplot as plt
 from pathlib import Path
-
-
-# In[5]:
-
-
-get_ipython().run_line_magic('matplotlib', 'inline')
-
-
-# In[ ]:
 
 
 import logging
@@ -37,15 +18,9 @@ logging.basicConfig(
 )
 
 
-# In[6]:
-
-
 from mingpt.utils import set_seed
 
 set_seed(42)  # make deterministic
-
-
-# In[7]:
 
 
 import pickle
@@ -53,9 +28,6 @@ import pickle
 def load_pickle(f_path):
     with open(f_path, 'rb') as fp:
         return pickle.load(fp)
-
-
-# In[72]:
 
 
 from sklearn.model_selection import train_test_split
@@ -76,10 +48,8 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
     return X_train, X_test, y_train, y_test
 
 
-# In[73]:
 
-
-dataset = load_pickle(Path('~/scratch/attila/results/minGPT_data.pkl').expanduser())  # list of (image, mask)
+dataset = load_pickle(Path('~/martin/minGPT_data.pkl').expanduser())  # list of (image, mask)
 X = dataset[0]  # list of images
 y = dataset[1]  # list of corresponding mask
 
@@ -94,9 +64,6 @@ y = np.array(np.ceil(y * 255), dtype='float32')
 X_train, X_test, y_train, y_test = get_train_test_split(X, y, 0.3, verbose=True)
 
 
-# In[74]:
-
-
 from torch.utils.data import TensorDataset, DataLoader
 
 tensor_X_train = torch.Tensor(X_train)  # tensors
@@ -108,14 +75,8 @@ t_train_dataset = TensorDataset(tensor_X_train, tensor_y_train)
 t_test_dataset = TensorDataset(tensor_X_test, tensor_y_test)
 
 
-# In[75]:
-
-
 # can skip k-means codebook strategy, since flattened image is 32 * 32-long sequence with pixels in [0, 255] ...
 # but do it anyway to trim some data nonetheless
-
-
-# In[85]:
 
 
 # run kmeans
@@ -126,17 +87,17 @@ def kmeans(x, ncluster, niter=10):
     for i in range(niter):
         # assign all pixels to the closest codebook element
         a = ((x[:, None, :] - c[None, :, :])**2).sum(-1).argmin(1)
-        
+
         # move each codebook element to be the mean of the pixels that assigned to it
         c = torch.stack([x[a==k].mean(0) for k in range(ncluster)])
-        
+
         # re-assign any poorly positioned codebook elements
         nanix = torch.any(torch.isnan(c), dim=1)
         ndead = nanix.sum().item()
-        
+
         print('done step %d/%d, re-initialized %d dead clusters' % (i+1, niter, ndead))
         c[nanix] = x[torch.randperm(N)[:ndead]] # re-init dead clusters
-    
+
     return c
 
 
@@ -150,29 +111,24 @@ with torch.no_grad():
     C = kmeans(px, ncluster, niter=8)
 
 
-# In[98]:
-
-
 # encode the training examples with our codebook to visualize how much we've lost in the discretization
 # these images should look normal ideally
 
-n_samples = 16
+n_samples = 32
 n_cols = 8
 n_rows = n_samples // n_cols
-fig, axis = plt.subplots(n_rows, n_cols, figsize=(64, 16))
+fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
 for ax, i in zip(axis.ravel(), np.random.randint(0, len(t_train_dataset), size=n_samples)):
     # encode and decode random data
     x, y = t_train_dataset[i]
     xpt = torch.from_numpy(np.array(x)).float().view(flattened_image_size, image_channels)
     ix = ((xpt[:, None, :] - C[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments for each pixel
-    
-    ax.imshow(C[ix].view(pixel_size, pixel_size, image_channels).numpy().astype(np.uint8), cmap='magma')
+
+    sample = C[ix].view(pixel_size, pixel_size, image_channels).numpy().astype(np.uint8)
+    ax.imshow(sample[..., 0], cmap='magma')
     ax.axis('off')
-    
-plt.savefig('clustered.png')
 
-
-# In[79]:
+plt.savefig('results/clustered.png')
 
 
 from torch.utils.data import Dataset
@@ -181,15 +137,15 @@ class ImageDataset(Dataset):
     """
     wrap up the pytorch CIFAR-10 dataset into our own, which will convert images into sequences of integers
     """
-    
+
     def __init__(self, pt_dataset, clusters, perm=None):
         self.pt_dataset = pt_dataset
         self.clusters = clusters
         self.perm = torch.arange(flattened_image_size) if perm is None else perm
-        
+
         self.vocab_size = clusters.size(0)
         self.block_size = flattened_image_size - 1
-        
+
     def __len__(self):
         return len(self.pt_dataset)
 
@@ -203,9 +159,6 @@ class ImageDataset(Dataset):
 
 train_dataset = ImageDataset(t_train_dataset, C)
 test_dataset = ImageDataset(t_test_dataset, C)
-
-
-# In[81]:
 
 
 from mingpt.model import GPT, GPTConfig, GPT1Config
@@ -223,30 +176,18 @@ mconf = GPTConfig(
 model = GPT(mconf)
 
 
-# In[10]:
-
-
 from mingpt.trainer import Trainer, TrainerConfig
 
-"""
-Note that I am running on an 8-GPU V100 machine so each GPU has 32GB.
-If you don't have as many computational resources you have to bring down
-the batch_size until the model fits into your memory, and then you may
-also need to adjust the learning rate (e.g. decrease it a bit). Alternatively,
-you can use an even smaller model up above, bringing down the number of layers,
-number of heads, and the embedding size.
-"""
-
 tokens_per_epoch = len(train_dataset) * train_dataset.block_size
-train_epochs = 20 # todo run a bigger model and longer, this is tiny
+train_epochs = 50
 
 # initialize a trainer instance and kick off training
-checkpoint_path = 'best_model.pt'
+checkpoint_path = 'results/latest_model.pt'
 tconf = TrainerConfig(
-    max_epochs=train_epochs, 
-    batch_size=4, 
+    max_epochs=train_epochs,
+    batch_size=4,
     learning_rate=3e-3,
-    betas = (0.9, 0.95), 
+    betas = (0.9, 0.95),
     weight_decay=0,
     lr_decay=True,
     warmup_tokens=tokens_per_epoch,
@@ -258,14 +199,8 @@ trainer = Trainer(model, train_dataset, test_dataset, tconf)
 trainer.train()
 
 
-# In[11]:
-
-
 checkpoint = torch.load(checkpoint_path)  # load the state of the best model we've seen based on early stopping
 model.load_state_dict(checkpoint)
-
-
-# In[12]:
 
 
 # to sample we also have to technically "train" a separate model for the first token in the sequence
@@ -282,18 +217,12 @@ for i in range(nest):
 prob = counts / counts.sum()  # normalize to have sum (prob) = 1
 
 
-# In[26]:
-
-
 from mingpt.utils import sample
 
-n_samples = 32
+n_samples = 40
 start_pixel = np.random.choice(np.arange(C.size(0)), size=(n_samples, 1), replace=True, p=prob.numpy())
 start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
-pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=50)
-
-
-# In[41]:
+pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=2)
 
 
 # for visualization we have to invert the permutation used to produce the pixels
@@ -303,33 +232,28 @@ n_cols = 8
 n_rows = n_samples // n_cols
 fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
 for i, ax in enumerate(axis.ravel()):
-    pxi = pixels[i][iperm] # note: undo the encoding permutation
-    sample = C[pxi].view(pixel_size, pixel_size, image_channels).numpy().astype(np.uint8)
-    
-    ax.imshow(sample[..., 0])  # grayscale -> 2D
+    pxi = pixels[i][iperm]  # note: undo the encoding permutation
+    pxi = C[pxi].view(pixel_size, pixel_size).numpy().astype(np.uint8)  # grayscale -> 2D
+
+    ax.imshow(pxi, cmap='magma')
     ax.axis('off')
 
-plt.savefig('samples.png')
-
-
-# In[31]:
+plt.savefig('results/samples.png')
 
 
 # visualize some of the learned positional embeddings, maybe they contain structure
 
-n_see = 2 * 4
-n_cols = 4
-n_rows = n_see // n_cols
-fig, axis = plt.subplots(n_rows, n_cols, figsize=(4, 4))
-for i, ax in enumerate(axis.ravel()):
-    ci = model.pos_emb.data[0, :, i].cpu()
-    zci = torch.cat((torch.tensor([0.0]), ci))  # pre-cat a zero
+fig, axis = plt.subplots(32, 8, figsize=(5, 5))  # 256 dimensions in embedding
+for dim, ax in enumerate(axis.ravel()):
+    ci = model.pos_emb.data[0, :, dim].cpu()  # 1023 tokens = pixels
+    zci = torch.cat((torch.tensor([0.0]), ci))  # pre-cat a zero => 1024 tokens
     rzci = zci[iperm]  # undo the permutation to recover the pixel space of the image
     embd = rzci.view(pixel_size, pixel_size).numpy()
 
-    ax.imshow(embd)
+    ax.imshow(embd, cmap='jet')
+    ax.set_title('dim #{}'.format(dim))
     ax.axis('off')
 
 
-plt.savefig('pos_embd.png')
+plt.savefig('results/pos_embd.png')
 

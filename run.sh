@@ -20,5 +20,5 @@ module load scikit-learn
 module load matplotlib
 module load h5py/2.10
 
-source ./venv/bin/activate
+source .venv/bin/activate
 ipython
