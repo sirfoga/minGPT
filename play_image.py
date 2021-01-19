@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
 import numpy as np
 import torchvision
 import torch
@@ -24,25 +21,14 @@ logging.basicConfig(
 import pickle
 from sklearn.model_selection import train_test_split
 
-
-# In[ ]:
-
-
 from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.data import Dataset
-
-
-# In[ ]:
-
 
 from mingpt.utils import set_seed, sample
 from mingpt.model import GPT, GPTConfig
 from mingpt.trainer import Trainer, TrainerConfig
 
 set_seed(42)  # make deterministic
-
-
-# In[ ]:
 
 
 def load_pickle(f_path):
@@ -63,9 +49,6 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
 
 
     return X_train, X_test, y_train, y_test
-
-
-# In[ ]:
 
 
 def get_data(file_path):
@@ -90,9 +73,6 @@ def get_data(file_path):
     t_test_dataset = TensorDataset(tensor_X_test, tensor_y_test)
 
     return t_train_dataset, t_test_dataset, X_train
-
-
-# In[ ]:
 
 
 def kmeans(x, ncluster, niter=10):
@@ -145,9 +125,6 @@ def get_quantization(dataset, n_clusters=256, do_plot=False):
     return C
 
 
-# In[ ]:
-
-
 class ImageDataset(Dataset):
     """
     wrap up the pytorch CIFAR-10 dataset into our own, which will convert images into sequences of integers
@@ -171,9 +148,6 @@ class ImageDataset(Dataset):
         x = x[self.perm].float()  # reshuffle pixels with any fixed permutation and -> float
         a = ((x[:, None, :] - self.clusters[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments
         return a[:-1], a[1:]  # always just predict the next one in the sequence
-
-
-# In[ ]:
 
 
 GPT_XS = dict(
@@ -224,6 +198,8 @@ def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
     trainer.train()
 
+    return trainer
+
 
 def model_first_token(dataset, X_train, n_clusters=256):
     counts = torch.ones(n_clusters)  # start counts as 1 not zero, this is called "smoothing"
@@ -239,7 +215,7 @@ def model_first_token(dataset, X_train, n_clusters=256):
     return prob
 
 
-def sample_some(model, dataset, X_train, C, n_samples=40, out_path='./results/samples.png'):
+def sample_some(trainer, model, dataset, X_train, C, n_samples=40, out_path='./results/samples.png'):
     prob = model_first_token(dataset, X_train)
 
     start_pixel = np.random.choice(np.arange(C.size(0)), size=(n_samples, 1), replace=True, p=prob.numpy())
@@ -263,26 +239,24 @@ def sample_some(model, dataset, X_train, C, n_samples=40, out_path='./results/sa
     plt.savefig(out_path)
 
 
-# In[ ]:
+def main():
+    t_train_dataset, t_test_dataset, X_train = get_data('~/martin/minGPT_data.pkl')
+    C = get_quantization(t_train_dataset)
+
+    train_dataset = ImageDataset(t_train_dataset, C)
+    test_dataset = ImageDataset(t_test_dataset, C)
+
+    model = get_model()
+
+    checkpoint_path = './latest_model.pt'
+    trainer = train(model, 30, train_dataset, test_dataset, checkpoint_path)
 
 
-t_train_dataset, t_test_dataset, X_train = get_data('~/martin/minGPT_data.pkl')
-C = get_quantization(t_train_dataset)
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
+    model.load_state_dict(checkpoint)
 
-train_dataset = ImageDataset(t_train_dataset, C)
-test_dataset = ImageDataset(t_test_dataset, C)
-
-model = get_model()
-
-checkpoint_path = './latest_model.pt'
-train(model, 30, train_dataset, test_dataset, checkpoint_path)
+    sample_some(trainer, model, train_dataset, X_train, C)
 
 
-# In[ ]:
-
-
-checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
-model.load_state_dict(checkpoint)
-
-sample_some(model, train_dataset, X_train, C)
-
+if __name__ == "__main__":
+    main()
