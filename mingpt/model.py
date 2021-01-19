@@ -21,18 +21,13 @@ class GPTConfig:
     embd_pdrop = 0.1
     resid_pdrop = 0.1
     attn_pdrop = 0.1
+    bert = False
 
     def __init__(self, vocab_size, block_size, **kwargs):
         self.vocab_size = vocab_size
         self.block_size = block_size
         for k,v in kwargs.items():
             setattr(self, k, v)
-
-class GPT1Config(GPTConfig):
-    """ GPT-1 like network roughly 125M params """
-    n_layer = 12
-    n_head = 12
-    n_embd = 768
 
 class CausalSelfAttention(nn.Module):
     """
@@ -117,6 +112,8 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
+        self.bert = config.bert
+
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
@@ -178,20 +175,39 @@ class GPT(nn.Module):
         return optimizer
 
     def forward(self, idx, targets=None):
+        bert = self.bert
+
         b, t = idx.size()
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
+        if bert:
+            M = torch.rand((4, 1023)).to('cuda')
+            M = ( M > 0.15 ).float()
+            M = M.unsqueeze_(-1)
+            M = M.repeat(1, 1, 256)
+
         # forward the GPT model
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
+        x = token_embeddings
+        
+        if bert:
+            x = x * M
+
         position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
-        x = self.drop(token_embeddings + position_embeddings)
+        x = x + position_embeddings
+
+        x = self.drop(x)
         x = self.blocks(x)
         x = self.ln_f(x)
-        logits = self.head(x)
+        logits = self.head(x)  # 4 x 1023 x 256
 
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
+            if bert:
+                IM = 1.0 - M
+                loss = loss * IM
 
         return logits, loss
