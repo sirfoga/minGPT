@@ -74,7 +74,6 @@ def get_data(file_path):
     y = dataset[1]  # list of corresponding mask
 
     pixel_size = X.shape[1]  # should be = X.shape[2] = 32
-    image_channels = X.shape[-1]  # should be = 1
 
     # convert pixels to [0, 255] range
     X = np.array(np.ceil(X * 255), dtype='float32')
@@ -120,7 +119,7 @@ def get_quantization(dataset, n_clusters=256, do_plot=False):
     # get random 5 pixels per image and stack them all up as rgb values to get half a million random pixels
     n_pixels = 5
     flattened_image_size = 32 * 32
-    pluck_rgb = lambda x: torch.from_numpy(np.array(x)).view(flattened_image_size, image_channels)[torch.randperm(flattened_image_size)[:n_pixels], :]
+    pluck_rgb = lambda x: torch.from_numpy(np.array(x)).view(flattened_image_size, 1)[torch.randperm(flattened_image_size)[:n_pixels], :]
     px = torch.cat([pluck_rgb(x) for x, y in dataset], dim=0).float()
 
     with torch.no_grad():
@@ -134,10 +133,10 @@ def get_quantization(dataset, n_clusters=256, do_plot=False):
         for ax, i in zip(axis.ravel(), np.random.randint(0, len(t_train_dataset), size=n_samples)):
             # encode and decode random data
             x, y = t_train_dataset[i]
-            xpt = torch.from_numpy(np.array(x)).float().view(flattened_image_size, image_channels)
+            xpt = torch.from_numpy(np.array(x)).float().view(flattened_image_size, 1)
             ix = ((xpt[:, None, :] - C[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments for each pixel
 
-            sample = C[ix].view(pixel_size, pixel_size, image_channels).numpy().astype(np.uint8)
+            sample = C[ix].view(pixel_size, pixel_size, 1).numpy().astype(np.uint8)
             ax.imshow(sample[..., 0], cmap='magma')
             ax.axis('off')
 
@@ -157,6 +156,7 @@ class ImageDataset(Dataset):
     def __init__(self, pt_dataset, clusters, perm=None):
         self.pt_dataset = pt_dataset
         self.clusters = clusters
+        flattened_image_size = 32 * 32
         self.perm = torch.arange(flattened_image_size) if perm is None else perm
 
         self.vocab_size = 256
@@ -167,7 +167,7 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, idx):
         x, y = self.pt_dataset[idx]
-        x = torch.from_numpy(np.array(x)).view(-1, image_channels)  # flatten out all pixels
+        x = torch.from_numpy(np.array(x)).view(-1, 1)  # flatten out all pixels
         x = x[self.perm].float()  # reshuffle pixels with any fixed permutation and -> float
         a = ((x[:, None, :] - self.clusters[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments
         return a[:-1], a[1:]  # always just predict the next one in the sequence
