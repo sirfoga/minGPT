@@ -217,23 +217,23 @@ def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
         weight_decay=0,
         lr_decay=True,
         warmup_tokens=tokens_per_epoch,
-        final_tokens=train_epochs * tokens_per_epoch,
+        final_tokens=n_epochs * tokens_per_epoch,
         ckpt_path=checkpoint_path,
         num_workers=1
     )
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
-    trainer.train()  # WARNING: this blows CPU
+    trainer.train()
 
 
-def sample_some(model, n_samples=40, out_path='./results/samples.png'):
+def sample_some(model, dataset, n_samples=40, out_path='./results/samples.png'):
     # to sample we also have to technically "train" a separate model for the first token in the sequence
     # we are going to do so below simply by calculating and normalizing the histogram of the first token
 
     counts = torch.ones(ncluster)  # start counts as 1 not zero, this is called "smoothing"
-    rp = torch.randperm(len(train_dataset))
+    rp = torch.randperm(len(dataset))
     nest = X_train.shape[0] // 2  # how many images to use for the estimation
     for i in range(nest):
-        a, _ = train_dataset[int(rp[i])]
+        a, _ = dataset[int(rp[i])]
         t = a[0].item()  # index of first token in the sequence
         counts[t] += 1
 
@@ -245,7 +245,7 @@ def sample_some(model, n_samples=40, out_path='./results/samples.png'):
     pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=40)  # WARNING: this blows CPU
 
     # for visualization we have to invert the permutation used to produce the pixels
-    iperm = torch.argsort(train_dataset.perm)
+    iperm = torch.argsort(dataset.perm)
 
     n_cols = 8
     n_rows = n_samples // n_cols
@@ -281,5 +281,5 @@ train(model, 30, train_dataset, test_dataset, checkpoint_path)
 checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
 model.load_state_dict(checkpoint)
 
-sample_some(model)
+sample_some(model, train_dataset)
 
