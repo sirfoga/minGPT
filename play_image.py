@@ -101,21 +101,22 @@ def kmeans(x, ncluster, niter=10):
 def get_quantization(dataset, n_clusters=256, do_plot=False):
     # get random 5 pixels per image and stack them all up as rgb values to get half a million random pixels
     n_pixels = 5
-    flattened_image_size = 32 * 32
+    pixel_size = 32
+    flattened_image_size = pixel_size * pixel_size
     pluck_rgb = lambda x: torch.from_numpy(np.array(x)).view(flattened_image_size, 1)[torch.randperm(flattened_image_size)[:n_pixels], :]
     px = torch.cat([pluck_rgb(x) for x, y in dataset], dim=0).float()
 
     with torch.no_grad():
-        C = kmeans(px, n_clusters, niter=8)
+        C = kmeans(px, n_clusters)
 
     if do_plot:  # to visualize how much we've lost in the discretization
         n_samples = 32
         n_cols = 8
         n_rows = n_samples // n_cols
         fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
-        for ax, i in zip(axis.ravel(), np.random.randint(0, len(t_train_dataset), size=n_samples)):
+        for ax, i in zip(axis.ravel(), np.random.randint(0, len(dataset), size=n_samples)):
             # encode and decode random data
-            x, y = t_train_dataset[i]
+            x, y = dataset[i]
             xpt = torch.from_numpy(np.array(x)).float().view(flattened_image_size, 1)
             ix = ((xpt[:, None, :] - C[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments for each pixel
 
@@ -153,32 +154,23 @@ class ImageDataset(Dataset):
         return a[:-1], a[1:]  # always just predict the next one in the sequence
 
 
-GPT_XS = dict(
-    embd_pdrop=0.0,
-    resid_pdrop=0.0,
-    attn_pdrop=0.0,
-    n_layer=16,
-    n_head=8,
-    n_embd=256
-)
-
-GPT_S = dict(
-    embd_pdrop=0.0,
-    resid_pdrop=0.0,
-    attn_pdrop=0.0,
-    n_layer=24,
-    n_head=8,
-    n_embd=512
-)
-
-
 def get_model(train_dataset):
+    GPT_S = dict(
+        embd_pdrop=0.0,
+        resid_pdrop=0.0,
+        attn_pdrop=0.0,
+        n_layer=20,  # 24,
+        n_head=8,
+        n_embd=256  # 512
+    )
+
     mconf = GPTConfig(
         train_dataset.vocab_size,
         train_dataset.block_size,
-        **GPT_XS,
-        bert=False,
+        **GPT_S,
+        bert=True,
     )
+
     return GPT(mconf)
 
 
@@ -246,7 +238,7 @@ def sample_some(trainer, model, dataset, X_train, C, n_samples=40, out_path='./r
 
 def main():
     t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')
-    C = get_quantization(t_train_dataset)
+    C = get_quantization(t_train_dataset, do_plot=True)
 
     train_dataset = ImageDataset(t_train_dataset, C)
     test_dataset = ImageDataset(t_test_dataset, C)
@@ -255,7 +247,6 @@ def main():
 
     checkpoint_path = './latest_model.pt'
     trainer = train(model, 50, train_dataset, test_dataset, checkpoint_path)
-
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
     model.load_state_dict(checkpoint)

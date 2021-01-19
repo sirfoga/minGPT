@@ -175,12 +175,10 @@ class GPT(nn.Module):
         return optimizer
 
     def forward(self, idx, targets=None):
-        bert = self.bert
-
         b, t = idx.size()
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
-        if bert:
+        if self.bert:
             M = torch.rand((b, t)).to('cuda')
             M = ( M > 0.15 ).float()
             M = M.unsqueeze_(-1)
@@ -188,9 +186,9 @@ class GPT(nn.Module):
 
         # forward the GPT model
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
-        x = token_embeddings
 
-        if bert:
+        x = token_embeddings
+        if self.bert:
             x = x * M
 
         position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
@@ -206,7 +204,7 @@ class GPT(nn.Module):
         if targets is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
 
-            if bert:
+            if self.bert:
                 IM = 1.0 - M
                 loss = loss * IM
 
