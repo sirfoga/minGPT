@@ -69,13 +69,12 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
 
 
 def get_data(file_path):
-    load_pickle(Path(file_path).expanduser())  # list of (image, mask)
+    dataset = load_pickle(Path(file_path).expanduser())  # list of (image, mask)
     X = dataset[0]  # list of images
     y = dataset[1]  # list of corresponding mask
 
     pixel_size = X.shape[1]  # should be = X.shape[2] = 32
     image_channels = X.shape[-1]  # should be = 1
-    flattened_image_size = pixel_size * pixel_size
 
     # convert pixels to [0, 255] range
     X = np.array(np.ceil(X * 255), dtype='float32')
@@ -120,6 +119,7 @@ def kmeans(x, ncluster, niter=10):
 def get_quantization(dataset, n_clusters=256, do_plot=False):
     # get random 5 pixels per image and stack them all up as rgb values to get half a million random pixels
     n_pixels = 5
+    flattened_image_size = 32 * 32
     pluck_rgb = lambda x: torch.from_numpy(np.array(x)).view(flattened_image_size, image_channels)[torch.randperm(flattened_image_size)[:n_pixels], :]
     px = torch.cat([pluck_rgb(x) for x, y in dataset], dim=0).float()
 
@@ -241,6 +241,7 @@ def sample_some(model, n_samples=40, out_path='./results/samples.png'):
 
     start_pixel = np.random.choice(np.arange(C.size(0)), size=(n_samples, 1), replace=True, p=prob.numpy())
     start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
+    flattened_image_size = 32 * 32
     pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=40)  # WARNING: this blows CPU
 
     # for visualization we have to invert the permutation used to produce the pixels
