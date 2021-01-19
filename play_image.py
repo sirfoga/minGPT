@@ -169,7 +169,7 @@ GPT_S = dict(
 )
 
 
-def get_model():
+def get_model(train_dataset):
     mconf = GPTConfig(
         train_dataset.vocab_size,
         train_dataset.block_size,
@@ -246,7 +246,7 @@ def main():
     train_dataset = ImageDataset(t_train_dataset, C)
     test_dataset = ImageDataset(t_test_dataset, C)
 
-    model = get_model()
+    model = get_model(train_dataset)
 
     checkpoint_path = './latest_model.pt'
     trainer = train(model, 30, train_dataset, test_dataset, checkpoint_path)
