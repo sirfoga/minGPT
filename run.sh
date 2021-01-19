@@ -9,9 +9,6 @@ srun \
     --account=p_ml_cv \
     --pty bash
 
-KERNEL_NAME="pytorch"
-KERNELS_DIR=/home/${USER}/kernels/
-
 module --force purge
 module load modenv/ml
 module load Python/3.7
@@ -21,4 +18,3 @@ module load matplotlib
 module load h5py/2.10
 
 source .venv/bin/activate
-ipython
