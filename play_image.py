@@ -89,7 +89,7 @@ def get_data(file_path):
     t_train_dataset = TensorDataset(tensor_X_train, tensor_y_train)
     t_test_dataset = TensorDataset(tensor_X_test, tensor_y_test)
 
-    return t_train_dataset, t_test_dataset
+    return t_train_dataset, t_test_dataset, X_train
 
 
 # In[ ]:
@@ -225,19 +225,22 @@ def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
     trainer.train()
 
 
-def sample_some(model, dataset, n_samples=40, out_path='./results/samples.png'):
-    # to sample we also have to technically "train" a separate model for the first token in the sequence
-    # we are going to do so below simply by calculating and normalizing the histogram of the first token
-
-    counts = torch.ones(ncluster)  # start counts as 1 not zero, this is called "smoothing"
+def model_first_token(dataset, X_train, n_clusters=256):
+    counts = torch.ones(n_clusters)  # start counts as 1 not zero, this is called "smoothing"
     rp = torch.randperm(len(dataset))
     nest = X_train.shape[0] // 2  # how many images to use for the estimation
+
     for i in range(nest):
         a, _ = dataset[int(rp[i])]
         t = a[0].item()  # index of first token in the sequence
         counts[t] += 1
 
     prob = counts / counts.sum()  # normalize to have sum (prob) = 1
+    return prob
+
+
+def sample_some(model, dataset, X_train, C, n_samples=40, out_path='./results/samples.png'):
+    prob = model_first_token(dataset, X_train)
 
     start_pixel = np.random.choice(np.arange(C.size(0)), size=(n_samples, 1), replace=True, p=prob.numpy())
     start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
@@ -263,7 +266,7 @@ def sample_some(model, dataset, n_samples=40, out_path='./results/samples.png'):
 # In[ ]:
 
 
-t_train_dataset, t_test_dataset = get_data('~/martin/minGPT_data.pkl')
+t_train_dataset, t_test_dataset, X_train = get_data('~/martin/minGPT_data.pkl')
 C = get_quantization(t_train_dataset)
 
 train_dataset = ImageDataset(t_train_dataset, C)
@@ -281,5 +284,5 @@ train(model, 30, train_dataset, test_dataset, checkpoint_path)
 checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
 model.load_state_dict(checkpoint)
 
-sample_some(model, train_dataset)
+sample_some(model, train_dataset, X_train, C)
 
