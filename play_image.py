@@ -12,7 +12,7 @@ from pathlib import Path
 import logging
 
 logging.basicConfig(
-  format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+  format="%(asctime)s|%(levelname)s|%(name)s|%(message)s",
   datefmt="%Y-%d-%d %H:%M:%S",
   level=logging.INFO,
   filename='play_image.log',
@@ -52,14 +52,17 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
 
 
 def get_data(file_path):
-    dataset = load_pickle(Path(file_path).expanduser())  # list of (image, mask)
-    X = dataset[0]  # list of images
-    y = dataset[1]  # list of corresponding mask
+    dataset = load_pickle(Path(file_path).expanduser())
 
-    pixel_size = X.shape[1]  # should be = X.shape[2] = 32
+    if len(dataset) == 2:  # (images, masks)
+        X = dataset[0]  # list of images
+        y = dataset[1]  # list of corresponding mask
+    else:  # unsupervised list of images
+        X = dataset
+        y = np.zeros(len(X))
 
-    # convert pixels to [0, 255] range
-    X = np.array(np.ceil(X * 255), dtype='float32')
+    pixel_size = X.shape[1]  # should be == X.shape[2] == 32
+    X = np.array(np.ceil(X * 255), dtype='float32')  # convert pixels to [0, 255] range
     y = np.array(np.ceil(y * 255), dtype='float32')
 
     X_train, X_test, y_train, y_test = get_train_test_split(X, y, 0.3, verbose=True)
@@ -154,7 +157,7 @@ GPT_XS = dict(
     embd_pdrop=0.0,
     resid_pdrop=0.0,
     attn_pdrop=0.0,
-    n_layer=12,
+    n_layer=16,
     n_head=8,
     n_embd=256
 )
@@ -174,7 +177,7 @@ def get_model(train_dataset):
         train_dataset.vocab_size,
         train_dataset.block_size,
         **GPT_XS,
-        bert=True,
+        bert=False,
     )
     return GPT(mconf)
 
@@ -226,6 +229,8 @@ def sample_some(trainer, model, dataset, X_train, C, n_samples=40, out_path='./r
     # for visualization we have to invert the permutation used to produce the pixels
     iperm = torch.argsort(dataset.perm)
 
+    pixel_size = 32
+
     n_cols = 8
     n_rows = n_samples // n_cols
     fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
@@ -240,7 +245,7 @@ def sample_some(trainer, model, dataset, X_train, C, n_samples=40, out_path='./r
 
 
 def main():
-    t_train_dataset, t_test_dataset, X_train = get_data('~/martin/minGPT_data.pkl')
+    t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')
     C = get_quantization(t_train_dataset)
 
     train_dataset = ImageDataset(t_train_dataset, C)
@@ -249,7 +254,7 @@ def main():
     model = get_model(train_dataset)
 
     checkpoint_path = './latest_model.pt'
-    trainer = train(model, 30, train_dataset, test_dataset, checkpoint_path)
+    trainer = train(model, 50, train_dataset, test_dataset, checkpoint_path)
 
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping

@@ -83,7 +83,7 @@ class Trainer:
                     losses.append(loss.item())
 
                 if is_train:
-
+                    logger.info("epoch,iter,train loss,lr")
                     # backprop and update the parameters
                     model.zero_grad()
                     loss.backward()
@@ -108,7 +108,7 @@ class Trainer:
 
                     # report progress
                     pbar.set_description(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
-                    logger.info(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
+                    logger.info(f"{epoch+1}{it}{loss.item():.5f}{lr:e}")
 
             if not is_train:
                 test_loss = float(np.mean(losses))

@@ -181,7 +181,7 @@ class GPT(nn.Module):
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         if bert:
-            M = torch.rand((4, 1023)).to('cuda')
+            M = torch.rand((b, t)).to('cuda')
             M = ( M > 0.15 ).float()
             M = M.unsqueeze_(-1)
             M = M.repeat(1, 1, 256)
@@ -189,7 +189,7 @@ class GPT(nn.Module):
         # forward the GPT model
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = token_embeddings
-        
+
         if bert:
             x = x * M
 
