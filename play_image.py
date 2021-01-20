@@ -58,7 +58,7 @@ def get_data(file_path):
         X = dataset[0]  # list of images
         y = dataset[1]  # list of corresponding mask
     else:  # unsupervised list of images
-        X = dataset
+        X = np.array(dataset, dtype='float32')
         y = np.zeros(len(X))
 
     pixel_size = X.shape[1]  # should be == X.shape[2] == 32
@@ -116,7 +116,7 @@ def get_quantization(dataset, n_clusters=256, do_plot=False):
         fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
         for ax, i in zip(axis.ravel(), np.random.randint(0, len(dataset), size=n_samples)):
             # encode and decode random data
-            x, y = dataset[i]
+            x, _ = dataset[i]
             xpt = torch.from_numpy(np.array(x)).float().view(flattened_image_size, 1)
             ix = ((xpt[:, None, :] - C[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments for each pixel
 
@@ -159,7 +159,7 @@ def get_model(train_dataset):
         embd_pdrop=0.0,
         resid_pdrop=0.0,
         attn_pdrop=0.0,
-        n_layer=20,  # 24,
+        n_layer=16,  # 24,
         n_head=8,
         n_embd=256  # 512
     )
@@ -238,7 +238,7 @@ def sample_some(trainer, model, dataset, X_train, C, n_samples=40, out_path='./r
 
 def main():
     t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')
-    C = get_quantization(t_train_dataset, do_plot=True)
+    C = get_quantization(t_train_dataset)
 
     train_dataset = ImageDataset(t_train_dataset, C)
     test_dataset = ImageDataset(t_test_dataset, C)
