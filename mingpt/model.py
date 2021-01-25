@@ -119,10 +119,13 @@ class GPT(nn.Module):
         self.apply(self._init_weights)
 
         self.use_embd = config.use_embd  # else dense layer
+        self.dense = nn.Linear(self.vocab_size, self.n_embd, bias=False)
 
         # bert
         self.bert = config.bert
 
+        # params
+        self.vocab_size = vocab_size
         self.n_embd = config.n_embd
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
@@ -200,8 +203,7 @@ class GPT(nn.Module):
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            dense = nn.Linear(1, self.n_embd, bias=False)
-            token_embeddings = dense(idx.unsqueeze_(-1).float())
+            token_embeddings = self.dense(idx.unsqueeze_(-1).float())
             token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
         x = token_embeddings  # batch x t x n_embeddings
