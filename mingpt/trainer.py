@@ -72,13 +72,13 @@ class Trainer:
             pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
             for it, (x, y) in pbar:
                 # place data on the correct device
-                x = x.to(self.device)  # first 1023 pixels of image
+                x = x.to(self.device)  # batch x first 1023 pixels of image
                 y = y.to(self.device)  # all but first pixel of image, i.e just a shifted version of x
 
                 # forward the model
                 with torch.set_grad_enabled(is_train):
                     logits, loss = model(x, y)
-                    loss = loss.mean() # collapse all losses if they are scattered on multiple gpus
+                    loss = loss.mean()  # collapse all losses if they are scattered on multiple gpus
                     losses.append(loss.item())
 
                 if is_train:

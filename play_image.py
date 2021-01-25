@@ -5,7 +5,6 @@ import numpy as np
 import torchvision
 import torch
 
-# %matplotlib inline
 import matplotlib.pyplot as plt
 
 from pathlib import Path
@@ -51,7 +50,7 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
     return X_train, X_test, y_train, y_test
 
 
-def get_data(file_path, max_imgs=2000):
+def get_data(file_path, max_imgs=2000):  # todo more images
     dataset = load_pickle(Path(file_path).expanduser())
 
     if len(dataset) == 2:  # (images, masks)
@@ -92,10 +91,12 @@ class ImageDataset(Dataset):
         return len(self.pt_dataset)
 
     def __getitem__(self, idx):
+        image_channels = 1  # grayscale
+
         x, y = self.pt_dataset[idx]
         x = torch.from_numpy(np.array(x)).view(-1, image_channels)  # flatten out all pixels
         x = x[self.perm].float()  # reshuffle pixels with any fixed permutation and -> float
-        a = x  # ((x[:, None, :] - self.clusters[None, :, :])**2).sum(-1).argmin(1)  # cluster assignments
+        a = x[:, 0]
         return a[:-1], a[1:]  # always just predict the next one in the sequence
 
 
@@ -173,7 +174,7 @@ def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./resu
     fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
     for i, ax in enumerate(axis.ravel()):
         pxi = pixels[i][iperm]  # undo the encoding permutation
-        pxi = pxi.view(pixel_size, pixel_size).numpy().astype(np.uint8)  # grayscale -> 2D
+        pxi = pxi.view(pixel_size, pixel_size).cpu().numpy().astype(np.uint8)  # grayscale -> 2D
 
         ax.imshow(pxi, cmap='magma')
         ax.axis('off')
@@ -189,7 +190,7 @@ def main():
     model = get_model(train_dataset)
 
     checkpoint_path = './latest_model.pt'
-    trainer = train(model, 50, train_dataset, test_dataset, checkpoint_path)
+    trainer = train(model, 20, train_dataset, test_dataset, checkpoint_path)
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
     model.load_state_dict(checkpoint)

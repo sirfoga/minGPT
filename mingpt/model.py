@@ -16,6 +16,7 @@ from torch.nn import functional as F
 
 logger = logging.getLogger(__name__)
 
+
 class GPTConfig:
     """ base GPT config, params common to all GPT versions """
     embd_pdrop = 0.1
@@ -28,6 +29,7 @@ class GPTConfig:
         self.block_size = block_size
         for k,v in kwargs.items():
             setattr(self, k, v)
+
 
 class CausalSelfAttention(nn.Module):
     """
@@ -73,6 +75,7 @@ class CausalSelfAttention(nn.Module):
         y = self.resid_drop(self.proj(y))
         return y
 
+
 class Block(nn.Module):
     """ an unassuming Transformer block """
 
@@ -93,6 +96,7 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln2(x))
         return x
 
+
 class GPT(nn.Module):
     """  the full GPT language model, with a context size of block_size """
 
@@ -100,11 +104,13 @@ class GPT(nn.Module):
         super().__init__()
 
         # input embedding stem
-        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)  # 256 x 256
+        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)  # 256 x 512
         self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))  # 1023 x 256
         self.drop = nn.Dropout(config.embd_pdrop)
+
         # transformer
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
+
         # decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
         self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
@@ -112,8 +118,10 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
+        # bert
         self.bert = config.bert
 
+        self.config = config
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
@@ -174,22 +182,26 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None):
-        b, t = idx.size()
+    def forward(self, idx, targets=None, use_embd=False):
+        b, t = idx.size()  # idx ~ batch x 1023
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         if self.bert:
+            prob = 0.15
+
             M = torch.rand((b, t)).to('cuda')
-            M = ( M > 0.15 ).float()
+            M = ( M > prob ).float()
             M = M.unsqueeze_(-1)
-            M = M.repeat(1, 1, 256)
+            M = M.repeat(1, 1, self.config.n_embd)
 
         # forward the GPT model
-        token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
+        if use_embd:
+            # each index maps to a (learnable) vector
+            token_embeddings = self.tok_emb(idx.long())
+        else:
+            token_embeddings = nn.Linear(1, self.config.n_embd, bias=False)(idx.unsqueeze_(-1).float())
 
-        # batch x 1023 x 256
-
-        x = token_embeddings
+        x = token_embeddings  # batch x 1023 x n_embeddings
         if self.bert:
             x = x * M
 
@@ -199,7 +211,7 @@ class GPT(nn.Module):
         x = self.drop(x)
         x = self.blocks(x)  # transf
         x = self.ln_f(x)  # layer normal
-        logits = self.head(x)  # batch x 1023 x 256
+        logits = self.head(x)  # batch x 1023 x embd
 
         # if we are given some desired targets also calculate the loss
         loss = None
