@@ -10,12 +10,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import logging
 
-logging.basicConfig(
-  format="%(asctime)s|%(levelname)s|%(name)s|%(message)s",
-  datefmt="%Y-%d-%d %H:%M:%S",
-  level=logging.INFO,
-  filename='play_image.log',
-)
+import time
 
 import pickle
 from sklearn.model_selection import train_test_split
@@ -26,6 +21,21 @@ from torch.utils.data import Dataset
 from mingpt.utils import set_seed, sample
 from mingpt.model import GPT, GPTConfig
 from mingpt.trainer import Trainer, TrainerConfig
+
+
+def now_utc():  # unix time
+    seconds = round(time.time())
+    millis = seconds * 1000
+    unix = int(millis)
+    return unix
+
+
+logging.basicConfig(
+  format="%(asctime)s|%(levelname)s|%(name)s|%(message)s",
+  datefmt="%Y-%d-%d %H:%M:%S",
+  level=logging.INFO,
+  filename='log_{}.log'.format(now_utc()),
+)
 
 set_seed(42)  # make deterministic
 
@@ -162,7 +172,7 @@ def model_first_token(dataset, X_train, n_clusters=256):
     return prob
 
 
-def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./results/samples.png'):
+def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./samples.png'):
     prob = model_first_token(dataset, X_train)
 
     start_pixel = np.random.choice(np.arange(dataset.vocab_size), size=(n_samples, 1), replace=True, p=prob.numpy())
@@ -193,19 +203,22 @@ def fine_tune(model):
 
 
 def main():
+    folder_out = 'wow'
+
     t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')  # raw data
     train_dataset = ImageDataset(t_train_dataset)  # build dataset
     test_dataset = ImageDataset(t_test_dataset)
 
     model = get_model(train_dataset)
 
-    checkpoint_path = './results/latest_model.pt'
+    checkpoint_path = './{}/latest_model.pt'.format(folder_out)
     trainer = train(model, 20, train_dataset, test_dataset, checkpoint_path)
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
     model.load_state_dict(checkpoint)
 
-    sample_some(trainer, model, train_dataset, X_train)
+    out_path='./{}/samples.png'.format(folder_out)
+    sample_some(trainer, model, train_dataset, X_train, out_path=out_path)
 
 
 if __name__ == "__main__":
