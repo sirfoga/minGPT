@@ -51,14 +51,14 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
     return X_train, X_test, y_train, y_test
 
 
-def get_data(file_path):
+def get_data(file_path, max_imgs=2000):
     dataset = load_pickle(Path(file_path).expanduser())
 
     if len(dataset) == 2:  # (images, masks)
         X = dataset[0]  # list of images
         y = dataset[1]  # list of corresponding mask
     else:  # unsupervised list of images
-        X = np.array(dataset, dtype='float32')
+        X = np.array(dataset, dtype='float32')[:max_imgs]
         y = np.zeros(len(X))
 
     pixel_size = X.shape[1]  # should be == X.shape[2] == 32
