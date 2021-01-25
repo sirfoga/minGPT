@@ -189,7 +189,7 @@ def main():
 
     model = get_model(train_dataset)
 
-    checkpoint_path = './latest_model.pt'
+    checkpoint_path = './results/latest_model.pt'
     trainer = train(model, 20, train_dataset, test_dataset, checkpoint_path)
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
