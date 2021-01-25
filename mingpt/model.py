@@ -118,6 +118,8 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
+        self.use_embd = config.use_embd  # else dense layer
+
         # bert
         self.bert = config.bert
 
@@ -182,8 +184,8 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None, use_embd=True):
-        b, t = idx.size()  # idx ~ batch x 1023
+    def forward(self, idx, targets=None):
+        b, t = idx.size()  # idx ~ batch x sequence length
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         if self.bert:
@@ -195,24 +197,28 @@ class GPT(nn.Module):
             M = M.repeat(1, 1, self.config.n_embd)
 
         # forward the GPT model
-        if use_embd:
+        if self.use_embd:
             # each index maps to a (learnable) vector
             token_embeddings = self.tok_emb(idx.long())
         else:
-            token_embeddings = nn.Linear(1, self.n_embd, bias=False)(idx.unsqueeze_(-1).float())
+            dense = nn.Linear(256, self.n_embd, bias=False)
+
+            aa = torch.nn.functional.one_hot(idx.to(torch.int64), num_classes=256)
+            aa = torch.tensor(aa, dtype=torch.float)
+            token_embeddings = dense(aa)
             token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
-        x = token_embeddings  # batch x 1023 x n_embeddings
+        x = token_embeddings  # batch x t x n_embeddings
         if self.bert:
             x = x * M
 
         position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
         x = x + position_embeddings
 
-        x = self.drop(x)
-        x = self.blocks(x)  # transf
-        x = self.ln_f(x)  # layer normal
-        logits = self.head(x)  # batch x 1023 x embd
+        x = self.drop(x)  # dropout
+        x = self.blocks(x)  # transformer
+        x = self.ln_f(x)  # layer normal (Dense)
+        logits = self.head(x)  # batch x t x n_embeddings
 
         # if we are given some desired targets also calculate the loss
         loss = None

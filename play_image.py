@@ -29,6 +29,14 @@ from mingpt.trainer import Trainer, TrainerConfig
 
 set_seed(42)  # make deterministic
 
+GPT_S = dict(
+    embd_pdrop=0.0,
+    resid_pdrop=0.0,
+    attn_pdrop=0.0,
+    n_layer=24,
+    n_head=8,
+    n_embd=512,
+)
 
 def load_pickle(f_path):
     with open(f_path, 'rb') as fp:
@@ -50,7 +58,7 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
     return X_train, X_test, y_train, y_test
 
 
-def get_data(file_path, max_imgs=2000):  # todo more images
+def get_data(file_path, max_imgs=2000):
     dataset = load_pickle(Path(file_path).expanduser())
 
     if len(dataset) == 2:  # (images, masks)
@@ -101,20 +109,18 @@ class ImageDataset(Dataset):
 
 
 def get_model(train_dataset):
-    GPT_S = dict(
-        embd_pdrop=0.0,
-        resid_pdrop=0.0,
-        attn_pdrop=0.0,
-        n_layer=16,  # should be 24
-        n_head=8,
-        n_embd=256  # because of grayscale, should be 512
+    MY_GPT = dict(
+        n_layer=16,
+        n_embd=8  # because of grayscale
     )
+    MY_GPT = {**GPT_S, **MY_GPT}  # inherit all other params
 
     mconf = GPTConfig(
         train_dataset.vocab_size,
         train_dataset.block_size,
-        **GPT_S,
+        **MY_GPT,
         bert=False,
+        use_embd=True,
     )
 
     return GPT(mconf)
@@ -150,7 +156,7 @@ def model_first_token(dataset, X_train, n_clusters=256):
     for i in range(nest):
         a, _ = dataset[int(rp[i])]
         t = a[0].item()  # index of first token in the sequence
-        counts[t] += 1
+        counts[int(t)] += 1
 
     prob = counts / counts.sum()  # normalize to have sum (prob) = 1
     return prob
@@ -162,7 +168,7 @@ def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./resu
     start_pixel = np.random.choice(np.arange(dataset.vocab_size), size=(n_samples, 1), replace=True, p=prob.numpy())
     start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
     flattened_image_size = 32 * 32
-    pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=40)  # WARNING: this blows CPU
+    pixels = sample(model, start_pixel, flattened_image_size - 1, temperature=1.0, sample=True, top_k=40)
 
     # for visualization we have to invert the permutation used to produce the pixels
     iperm = torch.argsort(dataset.perm)
@@ -182,6 +188,10 @@ def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./resu
     plt.savefig(out_path)
 
 
+def fine_tune(model):
+    pass
+
+
 def main():
     t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')  # raw data
     train_dataset = ImageDataset(t_train_dataset)  # build dataset
@@ -192,7 +202,7 @@ def main():
     checkpoint_path = './results/latest_model.pt'
     trainer = train(model, 20, train_dataset, test_dataset, checkpoint_path)
 
-    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))  # load the state of the best model we've seen based on early stopping
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
     model.load_state_dict(checkpoint)
 
     sample_some(trainer, model, train_dataset, X_train)
