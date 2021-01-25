@@ -100,8 +100,8 @@ class GPT(nn.Module):
         super().__init__()
 
         # input embedding stem
-        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)
-        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
+        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)  # 256 x 256
+        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))  # 1023 x 256
         self.drop = nn.Dropout(config.embd_pdrop)
         # transformer
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
@@ -187,6 +187,8 @@ class GPT(nn.Module):
         # forward the GPT model
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
 
+        # batch x 1023 x 256
+
         x = token_embeddings
         if self.bert:
             x = x * M
@@ -195,9 +197,9 @@ class GPT(nn.Module):
         x = x + position_embeddings
 
         x = self.drop(x)
-        x = self.blocks(x)
-        x = self.ln_f(x)
-        logits = self.head(x)  # 4 x 1023 x 256
+        x = self.blocks(x)  # transf
+        x = self.ln_f(x)  # layer normal
+        logits = self.head(x)  # batch x 1023 x 256
 
         # if we are given some desired targets also calculate the loss
         loss = None
