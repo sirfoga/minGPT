@@ -196,17 +196,12 @@ class GPT(nn.Module):
             M = M.unsqueeze_(-1)
             M = M.repeat(1, 1, self.config.n_embd)
 
-        # forward the GPT model
+        # each index maps to a (learnable) vector
         if self.use_embd:
-            # each index maps to a (learnable) vector
             token_embeddings = self.tok_emb(idx.long())
         else:
-            dense = nn.Linear(256, self.n_embd, bias=False)
-
-            aa = torch.nn.functional.one_hot(idx.to(torch.int64), num_classes=256)
-            aa = torch.tensor(aa, dtype=torch.float)
-            token_embeddings = dense(aa)
-            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
+            dense = nn.Linear(1, self.n_embd, bias=False)
+            token_embeddings = dense(idx.unsqueeze_(-1).float())
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:

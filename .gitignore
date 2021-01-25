@@ -1,4 +1,6 @@
 results/
+wow/
+*.log
 data/
 *.pt
 *.pkl

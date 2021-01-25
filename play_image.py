@@ -29,12 +29,12 @@ def now_utc():  # unix time
     unix = int(millis)
     return unix
 
-
+folder_out = 'results/256_dense/'
 logging.basicConfig(
   format="%(asctime)s|%(levelname)s|%(name)s|%(message)s",
   datefmt="%Y-%d-%d %H:%M:%S",
   level=logging.INFO,
-  filename='log_{}.log'.format(now_utc()),
+  filename='./{}/log_{}.log'.format(folder_out, now_utc()),
 )
 
 set_seed(42)  # make deterministic
@@ -121,7 +121,7 @@ class ImageDataset(Dataset):
 def get_model(train_dataset):
     MY_GPT = dict(
         n_layer=16,
-        n_embd=8  # because of grayscale
+        n_embd=256
     )
     MY_GPT = {**GPT_S, **MY_GPT}  # inherit all other params
 
@@ -130,7 +130,7 @@ def get_model(train_dataset):
         train_dataset.block_size,
         **MY_GPT,
         bert=False,
-        use_embd=True,
+        use_embd=False,
     )
 
     return GPT(mconf)
@@ -203,8 +203,6 @@ def fine_tune(model):
 
 
 def main():
-    folder_out = 'wow'
-
     t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')  # raw data
     train_dataset = ImageDataset(t_train_dataset)  # build dataset
     test_dataset = ImageDataset(t_test_dataset)
