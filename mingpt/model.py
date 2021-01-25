@@ -121,7 +121,7 @@ class GPT(nn.Module):
         # bert
         self.bert = config.bert
 
-        self.config = config
+        self.n_embd = config.n_embd
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
@@ -182,7 +182,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None, use_embd=False):
+    def forward(self, idx, targets=None, use_embd=True):
         b, t = idx.size()  # idx ~ batch x 1023
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
@@ -199,7 +199,8 @@ class GPT(nn.Module):
             # each index maps to a (learnable) vector
             token_embeddings = self.tok_emb(idx.long())
         else:
-            token_embeddings = nn.Linear(1, self.config.n_embd, bias=False)(idx.unsqueeze_(-1).float())
+            token_embeddings = nn.Linear(1, self.n_embd, bias=False)(idx.unsqueeze_(-1).float())
+            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
         x = token_embeddings  # batch x 1023 x n_embeddings
         if self.bert:
