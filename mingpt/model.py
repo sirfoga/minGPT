@@ -202,6 +202,7 @@ class GPT(nn.Module):
         else:
             dense = nn.Linear(1, self.n_embd, bias=False)
             token_embeddings = dense(idx.unsqueeze_(-1).float())
+            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:
