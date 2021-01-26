@@ -119,13 +119,15 @@ class GPT(nn.Module):
         self.apply(self._init_weights)
 
         self.use_embd = config.use_embd  # else dense layer
-        self.dense = nn.Linear(self.vocab_size, self.n_embd, bias=False)
+
+        self.magic_martin = 64
+        self.dense = nn.Linear(self.magic_martin, config.n_embd, bias=False)
 
         # bert
         self.bert = config.bert
 
         # params
-        self.vocab_size = vocab_size
+        self.vocab_size = config.vocab_size
         self.n_embd = config.n_embd
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
@@ -197,13 +199,14 @@ class GPT(nn.Module):
             M = torch.rand((b, t)).to('cuda')
             M = ( M > prob ).float()
             M = M.unsqueeze_(-1)
-            M = M.repeat(1, 1, self.config.n_embd)
+            M = M.repeat(1, 1, self.n_embd)
 
         # each index maps to a (learnable) vector
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            token_embeddings = self.dense(idx.unsqueeze_(-1).float())
+            idx = torch.cat(self.magic_martin * [ idx ]).view(b, t, self.magic_martin)
+            token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
             token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
         x = token_embeddings  # batch x t x n_embeddings
@@ -215,7 +218,9 @@ class GPT(nn.Module):
 
         x = self.drop(x)  # dropout
         x = self.blocks(x)  # transformer
-        x = self.ln_f(x)  # layer normal (Dense)
+        x = self.ln_f(x)  # normalization on dense; this is `h` in original code ~ batch x t x n_embeddings
+
+        # generative loss
         logits = self.head(x)  # batch x t x n_embeddings
 
         # if we are given some desired targets also calculate the loss
@@ -226,5 +231,20 @@ class GPT(nn.Module):
             if self.bert:
                 IM = 1.0 - M
                 loss = loss * IM
+
+        # finetuning loss (segmentation, in original paper they performed classification)
+        # see https://github.com/milesial/Pytorch-UNet/tree/master/unet
+        # with tf.variable_scope('clf', reuse=reuse):
+        #     classes = shape_list(Y)[1]
+        #     if hparams.clf:
+        #         wclf = tf.get_variable('wclf', [classes, hparams.n_embd],
+        #                               initializer=tf.random_normal_initializer(stddev=0.0))
+        #     else:
+        #         wclf = tf.zeros([classes, hparams.n_embd], dtype=tf.float32)
+
+        # h = tf.reduce_mean(h, axis=1)  # average pool over sequence
+        # clf_logits = tf.matmul(h, wclf, transpose_b=True)
+        # clf_losses = tf.nn.softmax_cross_entropy_with_logits_v2(logits=clf_logits, labels=Y)
+        # results['clf_loss'] = tf.reduce_mean(clf_losses)
 
         return logits, loss

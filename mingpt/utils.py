@@ -33,7 +33,6 @@ def sample(model, x, steps, temperature=1.0, sample=False, top_k=None):
     block_size = model.get_block_size()
     model.eval()
     for k in range(steps):
-        print(k, steps)
         x_cond = x if x.size(1) <= block_size else x[:, -block_size:]  # crop context if needed
         logits, _ = model(x_cond.detach().clone())  # n_samples x step x n_embd
 

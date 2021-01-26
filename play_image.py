@@ -22,19 +22,13 @@ from mingpt.utils import set_seed, sample
 from mingpt.model import GPT, GPTConfig
 from mingpt.trainer import Trainer, TrainerConfig
 
+import os
 
-def now_utc():  # unix time
-    seconds = round(time.time())
-    millis = seconds * 1000
-    unix = int(millis)
-    return unix
 
-folder_out = 'results/256_dense/'
 logging.basicConfig(
-  format="%(asctime)s|%(levelname)s|%(name)s|%(message)s",
-  datefmt="%Y-%d-%d %H:%M:%S",
+  format='%(asctime)s|%(levelname)s|%(name)s|%(message)s',
+  datefmt='%Y-%d-%d %H:%M:%S',
   level=logging.INFO,
-  filename='./{}/log_{}.log'.format(folder_out, now_utc()),
 )
 
 set_seed(42)  # make deterministic
@@ -47,6 +41,14 @@ GPT_S = dict(
     n_head=8,
     n_embd=512,
 )
+
+
+def now_utc():  # unix time
+    seconds = round(time.time())
+    millis = seconds * 1000
+    unix = int(millis)
+    return unix
+
 
 def load_pickle(f_path):
     with open(f_path, 'rb') as fp:
@@ -118,21 +120,7 @@ class ImageDataset(Dataset):
         return a[:-1], a[1:]  # always just predict the next one in the sequence
 
 
-def get_model(train_dataset):
-    MY_GPT = dict(
-        n_layer=16,
-        n_embd=256
-    )
-    MY_GPT = {**GPT_S, **MY_GPT}  # inherit all other params
-
-    mconf = GPTConfig(
-        train_dataset.vocab_size,
-        train_dataset.block_size,
-        **MY_GPT,
-        bert=False,
-        use_embd=False,
-    )
-
+def get_model(train_dataset, gpt_conf):
     return GPT(mconf)
 
 
@@ -202,22 +190,65 @@ def fine_tune(model):
     pass
 
 
-def main():
-    t_train_dataset, t_test_dataset, X_train = get_data('./data/brain.pkl')  # raw data
+def do_it(data_path, n_embd, use_embd, folder_out):
+    os.makedirs(folder_out)
+
+    filename = './{}/log_{}.log'.format(folder_out, now_utc())
+    fileh = logging.FileHandler(filename, 'a')
+    log = logging.getLogger()  # root logger
+    for hdlr in log.handlers[:]:  # remove all old handlers
+        log.removeHandler(hdlr)
+    log.addHandler(fileh)      # set the new handler
+
+    t_train_dataset, t_test_dataset, X_train = get_data(data_path)  # raw data
     train_dataset = ImageDataset(t_train_dataset)  # build dataset
     test_dataset = ImageDataset(t_test_dataset)
 
-    model = get_model(train_dataset)
+    MY_GPT = dict(
+        n_layer=16,
+        n_embd=n_embd
+    )
+    MY_GPT = {**GPT_S, **MY_GPT}  # inherit all other params
+
+    mconf = GPTConfig(
+        train_dataset.vocab_size,
+        train_dataset.block_size,
+        **MY_GPT,
+        bert=False,
+        use_embd=use_embd,
+    )
+
+    model = get_model(train_dataset, gpt_conf)
 
     checkpoint_path = './{}/latest_model.pt'.format(folder_out)
-    trainer = train(model, 20, train_dataset, test_dataset, checkpoint_path)
+    trainer = train(model, 1, train_dataset, test_dataset, checkpoint_path)
 
-    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
-    model.load_state_dict(checkpoint)
+    # checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
+    # model.load_state_dict(checkpoint)
 
-    out_path='./{}/samples.png'.format(folder_out)
-    sample_some(trainer, model, train_dataset, X_train, out_path=out_path)
+    # out_path='./{}/samples.png'.format(folder_out)
+    # sample_some(trainer, model, train_dataset, X_train, out_path=out_path)
+
+
+def do_them():
+    params = [
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 256,
+            'use_embd': True,
+            'folder_out': './results/brain/embd_256/',
+        },
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 128,
+            'use_embd': True,
+            'folder_out': './results/brain/embd_128/',
+        }
+    ]
+
+    for param in params:
+        do_it(**param)
 
 
 if __name__ == "__main__":
-    main()
+    do_them()
