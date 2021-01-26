@@ -27,7 +27,6 @@ def sample(model, x, steps, temperature=1.0, sample=False, top_k=None):
     has quadratic complexity unlike an RNN that is only linear, and has a finite context window
     of block_size, unlike an RNN that has an infinite context window.
     """
-    print(x.shape)
 
 
     block_size = model.get_block_size()

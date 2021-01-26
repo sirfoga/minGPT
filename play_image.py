@@ -63,8 +63,8 @@ def get_train_test_split(X, y, test_size, random_state=42, verbose=False):
     )
 
     if verbose:
-        print('train data: X ~ {}, y ~ {}'.format(X_train.shape, y_train.shape))
-        print('test data: X ~ {}, y ~ {}'.format(X_test.shape, y_test.shape))
+        logging.getLogger(__name__).info('train data: X ~ {}, y ~ {}'.format(X_train.shape, y_train.shape))
+        logging.getLogger(__name__).info('test data: X ~ {}, y ~ {}'.format(X_test.shape, y_test.shape))
 
 
     return X_train, X_test, y_train, y_test
@@ -120,7 +120,7 @@ class ImageDataset(Dataset):
         return a[:-1], a[1:]  # always just predict the next one in the sequence
 
 
-def get_model(train_dataset, gpt_conf):
+def get_model(mconf):
     return GPT(mconf)
 
 
@@ -218,16 +218,16 @@ def do_it(data_path, n_embd, use_embd, folder_out):
         use_embd=use_embd,
     )
 
-    model = get_model(train_dataset, gpt_conf)
+    model = get_model(mconf)
 
     checkpoint_path = './{}/latest_model.pt'.format(folder_out)
     trainer = train(model, 1, train_dataset, test_dataset, checkpoint_path)
 
-    # checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
-    # model.load_state_dict(checkpoint)
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
+    model.load_state_dict(checkpoint)
 
-    # out_path='./{}/samples.png'.format(folder_out)
-    # sample_some(trainer, model, train_dataset, X_train, out_path=out_path)
+    out_path='./{}/samples.png'.format(folder_out)
+    sample_some(trainer, model, train_dataset, X_train, out_path=out_path)
 
 
 def do_them():
@@ -240,9 +240,69 @@ def do_them():
         },
         {
             'data_path': './data/brain.pkl',
-            'n_embd': 128,
+            'n_embd': 32,
             'use_embd': True,
-            'folder_out': './results/brain/embd_128/',
+            'folder_out': './results/brain/embd_32/',
+        },
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 8,
+            'use_embd': True,
+            'folder_out': './results/brain/embd_8/',
+        },
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 256,
+            'use_embd': False,
+            'folder_out': './results/brain/dense_256/',
+        },
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 32,
+            'use_embd': False,
+            'folder_out': './results/brain/dense_32/',
+        },
+        {
+            'data_path': './data/brain.pkl',
+            'n_embd': 8,
+            'use_embd': False,
+            'folder_out': './results/brain/dense_8/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 256,
+            'use_embd': True,
+            'folder_out': './results/toy/embd_256/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 32,
+            'use_embd': True,
+            'folder_out': './results/toy/embd_32/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 8,
+            'use_embd': True,
+            'folder_out': './results/toy/embd_8/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 256,
+            'use_embd': False,
+            'folder_out': './results/toy/dense_256/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 32,
+            'use_embd': False,
+            'folder_out': './results/toy/dense_32/',
+        },
+        {
+            'data_path': './data/toy.pkl',
+            'n_embd': 8,
+            'use_embd': False,
+            'folder_out': './results/toy/dense_8/',
         }
     ]
 
