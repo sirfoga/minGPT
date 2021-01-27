@@ -212,10 +212,6 @@ class GPT(nn.Module):
             token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
             token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')  # just to be sure
 
-            # idx = torch.cat(self.mm * [ idx ]).view(b, t, self.mm)  # batch x t x mm
-            # token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
-            # token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
-
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:
             x = x * M

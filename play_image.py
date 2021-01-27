@@ -235,74 +235,38 @@ def do_them():
         {
             'data_path': './data/brain.pkl',
             'n_embd': 256,
-            'use_embd': True,
-            'folder_out': './results/brain/embd_256/',
-        },
-        {
-            'data_path': './data/brain.pkl',
-            'n_embd': 32,
-            'use_embd': True,
-            'folder_out': './results/brain/embd_32/',
-        },
-        {
-            'data_path': './data/brain.pkl',
-            'n_embd': 8,
-            'use_embd': True,
-            'folder_out': './results/brain/embd_8/',
-        },
-        {
-            'data_path': './data/brain.pkl',
-            'n_embd': 256,
             'use_embd': False,
-            'folder_out': './results/brain/dense_256/',
+            'folder_out': './results/cremi/ll_256/',
         },
         {
             'data_path': './data/brain.pkl',
             'n_embd': 32,
             'use_embd': False,
-            'folder_out': './results/brain/dense_32/',
+            'folder_out': './results/cremi/ll_32/',
         },
         {
             'data_path': './data/brain.pkl',
             'n_embd': 8,
             'use_embd': False,
-            'folder_out': './results/brain/dense_8/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 256,
-            'use_embd': True,
-            'folder_out': './results/toy/embd_256/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 32,
-            'use_embd': True,
-            'folder_out': './results/toy/embd_32/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 8,
-            'use_embd': True,
-            'folder_out': './results/toy/embd_8/',
+            'folder_out': './results/cremi/ll_8/',
         },
         {
             'data_path': './data/toy.pkl',
             'n_embd': 256,
             'use_embd': False,
-            'folder_out': './results/toy/dense_256/',
+            'folder_out': './results/toy/ll_256/',
         },
         {
             'data_path': './data/toy.pkl',
             'n_embd': 32,
             'use_embd': False,
-            'folder_out': './results/toy/dense_32/',
+            'folder_out': './results/toy/ll_32/',
         },
         {
             'data_path': './data/toy.pkl',
             'n_embd': 8,
             'use_embd': False,
-            'folder_out': './results/toy/dense_8/',
+            'folder_out': './results/toy/ll_8/',
         }
     ]
 
