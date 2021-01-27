@@ -221,7 +221,7 @@ def do_it(data_path, n_embd, use_embd, folder_out):
     model = get_model(mconf)
 
     checkpoint_path = './{}/latest_model.pt'.format(folder_out)
-    trainer = train(model, 1, train_dataset, test_dataset, checkpoint_path)
+    trainer = train(model, 50, train_dataset, test_dataset, checkpoint_path)
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
     model.load_state_dict(checkpoint)

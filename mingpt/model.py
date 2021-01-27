@@ -120,8 +120,8 @@ class GPT(nn.Module):
 
         self.use_embd = config.use_embd  # else dense layer
 
-        self.magic_martin = 64
-        self.dense = nn.Linear(self.magic_martin, config.n_embd, bias=False)
+        self.mm = 64
+        self.dense = nn.Linear(self.mm, config.n_embd, bias=False)
 
         # bert
         self.bert = config.bert
@@ -205,9 +205,16 @@ class GPT(nn.Module):
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            idx = torch.cat(self.magic_martin * [ idx ]).view(b, t, self.magic_martin)
+            ratio = 256 / self.mm
+            idx = idx / ratio  # 256 -> self.mm
+            idx = torch.eye(self.mm)[idx.long()]  # one-hot encoding
+            idx = torch.tensor(idx, dtype=torch.float).to('cuda:0').view(b, t, self.mm)
             token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
-            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
+            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')  # just to be sure
+
+            # idx = torch.cat(self.mm * [ idx ]).view(b, t, self.mm)  # batch x t x mm
+            # token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
+            # token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:
