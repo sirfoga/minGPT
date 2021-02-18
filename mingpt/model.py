@@ -120,8 +120,12 @@ class GPT(nn.Module):
 
         self.use_embd = config.use_embd  # else dense layer
 
-        self.mm = 64
-        self.dense = nn.Linear(self.mm, config.n_embd, bias=False)
+        # self.ln_c = nn.LayerNorm((4, 1023))
+        self.c = nn.Sequential(
+            nn.Conv1d(1, 64, kernel_size=1, stride=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=False),
+        )
 
         # bert
         self.bert = config.bert
@@ -154,8 +158,8 @@ class GPT(nn.Module):
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay = set()
         no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, )
-        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        whitelist_weight_modules = (torch.nn.Linear)
+        blacklist_weight_modules = (torch.nn.Conv1d, torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -202,15 +206,15 @@ class GPT(nn.Module):
             M = M.repeat(1, 1, self.n_embd)
 
         # each index maps to a (learnable) vector
+        self.use_embd = True
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            ratio = 256 / self.mm
-            idx = idx / ratio  # 256 -> self.mm
-            idx = torch.eye(self.mm)[idx.long()]  # one-hot encoding
-            idx = torch.tensor(idx, dtype=torch.float).to('cuda:0').view(b, t, self.mm)
-            token_embeddings = self.dense(idx.float()).view(b, t, self.n_embd)
-            token_embeddings = torch.tensor(token_embeddings, dtype=torch.float).to('cuda:0')  # just to be sure
+            idx = idx.unsqueeze(-1).view([b, 1, t])
+            token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
+            token_embeddings = token_embeddings.view(b, t, 256)
+
+        print('te', token_embeddings.mean(axis=-1).mean(axis=-1))
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:

@@ -221,7 +221,7 @@ def do_it(data_path, n_embd, use_embd, folder_out):
     model = get_model(mconf)
 
     checkpoint_path = './{}/latest_model.pt'.format(folder_out)
-    trainer = train(model, 50, train_dataset, test_dataset, checkpoint_path)
+    trainer = train(model, 10, train_dataset, test_dataset, checkpoint_path)
 
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda:0'))  # also on CPU
     model.load_state_dict(checkpoint)
@@ -237,36 +237,6 @@ def do_them():
             'n_embd': 256,
             'use_embd': False,
             'folder_out': './results/cremi/ll_256/',
-        },
-        {
-            'data_path': './data/brain.pkl',
-            'n_embd': 32,
-            'use_embd': False,
-            'folder_out': './results/cremi/ll_32/',
-        },
-        {
-            'data_path': './data/brain.pkl',
-            'n_embd': 8,
-            'use_embd': False,
-            'folder_out': './results/cremi/ll_8/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 256,
-            'use_embd': False,
-            'folder_out': './results/toy/ll_256/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 32,
-            'use_embd': False,
-            'folder_out': './results/toy/ll_32/',
-        },
-        {
-            'data_path': './data/toy.pkl',
-            'n_embd': 8,
-            'use_embd': False,
-            'folder_out': './results/toy/ll_8/',
         }
     ]
 

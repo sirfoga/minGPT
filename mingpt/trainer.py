@@ -75,6 +75,9 @@ class Trainer:
                 x = x.to(self.device)  # batch x first 1023 pixels of image
                 y = y.to(self.device)  # all but first pixel of image, i.e just a shifted version of x
 
+                x = x.float() / 255.0  # normalize pixels [0, 255] -> [0, 1]
+                # y = y.float() / 255.0
+
                 # forward the model
                 with torch.set_grad_enabled(is_train):
                     logits, loss = model(x, y)
