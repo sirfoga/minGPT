@@ -210,7 +210,7 @@ class GPT(nn.Module):
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            idx = idx.unsqueeze(-1).view([b, 1, t])
+            idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
             token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
             token_embeddings = token_embeddings.view(b, t, 256)
 
