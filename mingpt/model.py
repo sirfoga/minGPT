@@ -17,6 +17,45 @@ from torch.nn import functional as F
 logger = logging.getLogger(__name__)
 
 
+def normal(mu, sigma):
+    def _f(x):
+          return 1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (x - mu)**2 / (2 * sigma**2))
+    return _f
+
+  
+def soft_quant(classes, sigma, norm=nn.Softmax(dim=0), trans=True):
+    basis = torch.linspace(0, classes - 1, classes)
+        
+    def _f(x):
+        N = normal(x, sigma)
+        vector = torch.stack([
+            N(b) for b in basis
+        ], dim=0)
+        
+        if norm:
+            vector = norm(vector)
+        
+        if trans:
+            vector = torch.transpose(vector, 0, 1)
+
+        return vector
+    return _f
+
+
+def apply_batchwise(func, M):
+    tList = [ func(m) for m in torch.unbind(M, dim=0) ]  # batch is first index
+    return torch.stack(tList, dim=0)
+
+
+def soft_torch(**kwargs):
+    s = soft_quant(**kwargs)
+
+    def _f(x):  # x ~ batch x elements
+        return apply_batchwise(s, x)
+
+    return _f
+
+
 class GPTConfig:
     """ base GPT config, params common to all GPT versions """
     embd_pdrop = 0.1
@@ -126,6 +165,9 @@ class GPT(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=False),
         )
+        self.n_soft_classes = 32
+        self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
+        self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=0.5, trans=False)
 
         # bert
         self.bert = config.bert
@@ -210,8 +252,12 @@ class GPT(nn.Module):
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
-            token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
+            token_embeddings = idx.float().view(b, t)
+            token_embeddings = self.soft_q(idx)
+            token_embeddings = self.gc(token_embeddings)  # 4 x 256 x 1023
+
+            # idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
+            # token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
             token_embeddings = token_embeddings.view(b, t, 256)
 
         print('te', token_embeddings.mean(axis=-1).mean(axis=-1))
