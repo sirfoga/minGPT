@@ -17,34 +17,43 @@ from torch.nn import functional as F
 logger = logging.getLogger(__name__)
 
 
+def apply_batchwise(func, M):
+    tList = [ func(m) for m in torch.unbind(M, dim=0) ]  # batch is first index
+    return torch.stack(tList, dim=0)
+
+
+def minmax_norm():
+    def _f(x):
+        d = lambda x: torch.div(x, torch.max(x))
+        return apply_batchwise(d, x)
+    
+    return _f
+
+
 def normal(mu, sigma):
     def _f(x):
           return 1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (x - mu)**2 / (2 * sigma**2))
     return _f
 
   
-def soft_quant(classes, sigma, norm=nn.Softmax(dim=0), trans=True):
+def soft_quant(classes, sigma, norm=minmax_norm(), trans=True):
     basis = torch.linspace(0, classes - 1, classes)
         
     def _f(x):
-        N = normal(x, sigma)
+        N = normal(x * (classes - 1), sigma)
         vector = torch.stack([
             N(b) for b in basis
         ], dim=0)
         
         if norm:
-            vector = norm(vector)
+            vector = norm(torch.transpose(vector, 0, 1))
+            vector = torch.transpose(vector, 0, 1)
         
         if trans:
             vector = torch.transpose(vector, 0, 1)
 
         return vector
     return _f
-
-
-def apply_batchwise(func, M):
-    tList = [ func(m) for m in torch.unbind(M, dim=0) ]  # batch is first index
-    return torch.stack(tList, dim=0)
 
 
 def soft_torch(**kwargs):
@@ -167,7 +176,7 @@ class GPT(nn.Module):
         )
         self.n_soft_classes = 32
         self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
-        self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=0.5, trans=False)
+        self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=1, trans=False)
 
         # bert
         self.bert = config.bert
