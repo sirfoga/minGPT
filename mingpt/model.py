@@ -166,24 +166,27 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
+        self.vocab_size = config.vocab_size
+        self.n_embd = config.n_embd
+
         self.use_embd = config.use_embd  # else dense layer
+        self.dense = nn.Linear(64, 256, bias=False)
 
         # self.ln_c = nn.LayerNorm((4, 1023))
-        self.c = nn.Sequential(
-            nn.Conv1d(1, 64, kernel_size=1, stride=1),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=False),
-        )
-        self.n_soft_classes = 32
-        self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
-        self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=1, trans=False)
+        # self.c = nn.Sequential(
+        #     nn.Conv1d(1, 64, kernel_size=1, stride=1),
+        #     nn.LeakyReLU(inplace=True),
+        #     nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=False),
+        # )
+        # self.n_soft_classes = 32
+        # self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
+        # self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=1, trans=False)
 
         # bert
         self.bert = config.bert
 
         # params
-        self.vocab_size = config.vocab_size
-        self.n_embd = config.n_embd
+        # 
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
@@ -268,8 +271,6 @@ class GPT(nn.Module):
             # idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
             # token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
             token_embeddings = token_embeddings.view(b, t, 256)
-
-        print('te', token_embeddings.mean(axis=-1).mean(axis=-1))
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:
