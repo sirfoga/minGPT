@@ -36,7 +36,7 @@ def sample(model, x, steps, temperature=1.0, sample=False, top_k=None):
         x_cond = x if x.size(1) <= block_size else x[:, -block_size:]  # crop context if needed
         # logits, _ = model(x_cond.detach().clone().float())  # n_samples x step x n_embd
         # logits, _ = model(x_cond.detach().clone().float() / 256.0 )  # n_samples x step x n_embd
-        logits, _ = model(x_cond.detach().clone().float(), step=k)  # n_samples x step x n_embd
+        logits, _ = model(x_cond.detach().clone().float(), plot_embd=k==steps - 1)  # n_samples x step x n_embd
 
         # pluck the logits at the final step and scale by temperature
         logits = logits[:, -1, :] / temperature  # just the last pixel: n_samples x n_embd
