@@ -14,6 +14,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+import matplotlib.pyplot as plt
+
 logger = logging.getLogger(__name__)
 
 
@@ -247,7 +249,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, step=0):
         b, t = idx.size()  # idx ~ batch x sequence length
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
@@ -260,7 +262,6 @@ class GPT(nn.Module):
             M = M.repeat(1, 1, self.n_embd)
 
         # each index maps to a (learnable) vector
-        self.use_embd = True
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
@@ -271,6 +272,21 @@ class GPT(nn.Module):
             # idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
             # token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
             token_embeddings = token_embeddings.view(b, t, 256)
+
+        _b, _t, _d = token_embeddings.size()
+
+        n_cols = 8
+        n_rows = 40 // n_cols
+        fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
+        for i, ax in enumerate(axis.ravel()):
+            ti = token_embeddings[i]
+            ti = ti.view(_t, _d).numpy()
+
+            ax.imshow(ti, cmap='jet')
+            ax.axis('off')
+
+        plt.savefig('./embds/at_step_{}.png'.format(step))
+        plt.close('all')
 
         x = token_embeddings  # batch x t x n_embeddings
         if self.bert:

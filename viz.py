@@ -4,11 +4,6 @@
 # In[1]:
 
 
-get_ipython().run_line_magic('load_ext', 'autoreload')
-get_ipython().run_line_magic('reload_ext', 'autoreload')
-get_ipython().run_line_magic('autoreload', '2')
-
-
 # In[2]:
 
 
@@ -216,7 +211,7 @@ def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
         num_workers=1
     )
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
-    # already train trainer.train()
+    # already trained trainer.train()
 
     return trainer
 
