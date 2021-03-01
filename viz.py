@@ -88,16 +88,16 @@ mconf = GPTConfig(
     1023,
     **MY_GPT,
     bert=False,
-    use_embd=True,
+    use_embd=False,
 )
 
 
 # In[7]:
 
 
-device = torch.device('cpu')
+# device = torch.device('cpu')
 model = get_model(mconf)
-model.load_state_dict(torch.load(model_file, map_location=device))
+# model.load_state_dict(torch.load(model_file, map_location=device))
 
 
 # In[8]:
@@ -180,18 +180,21 @@ def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./samp
     iperm = torch.argsort(dataset.perm)
 
     pixel_size = 32
+    plt.close('all')
 
     n_cols = 8
     n_rows = n_samples // n_cols
-    fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
+    fig, axis = plt.subplots(n_rows, n_cols, figsize=(32, 16))
     for i, ax in enumerate(axis.ravel()):
         pxi = pixels[i][iperm]  # undo the encoding permutation
         pxi = pxi.view(pixel_size, pixel_size).cpu().numpy().astype(np.uint8)  # grayscale -> 2D
 
         ax.imshow(pxi, cmap='magma')
-        ax.axis('off')
+        # ax.set_aspect(aspect=1.0)
 
+    plt.tight_layout()
     plt.savefig(out_path)
+    plt.close('all')
     
     
 def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
@@ -211,7 +214,7 @@ def train(model, n_epochs, train_dataset, test_dataset, checkpoint_path):
         num_workers=1
     )
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
-    # already trained trainer.train()
+    trainer.train()
 
     return trainer
 
