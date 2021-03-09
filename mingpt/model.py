@@ -8,6 +8,7 @@ GPT model:
 """
 
 import math
+import numpy as np
 import logging
 
 import torch
@@ -39,8 +40,8 @@ def normal(mu, sigma):
 
   
 def soft_quant(classes, sigma, norm=minmax_norm(), trans=True):
-    basis = torch.linspace(0, classes - 1, classes)
-        
+    basis = np.linspace(0, classes - 1, classes)
+ 
     def _f(x):
         N = normal(x * (classes - 1), sigma)
         vector = torch.stack([
@@ -175,14 +176,14 @@ class GPT(nn.Module):
         self.dense = nn.Linear(64, 256, bias=False)
 
         # self.ln_c = nn.LayerNorm((4, 1023))
-        # self.c = nn.Sequential(
-        #     nn.Conv1d(1, 64, kernel_size=1, stride=1),
-        #     nn.LeakyReLU(inplace=True),
-        #     nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=False),
-        # )
-        # self.n_soft_classes = 32
-        # self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
-        # self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=1, trans=False)
+        self.c = nn.Sequential(
+             nn.Conv1d(1, 64, kernel_size=1, stride=1),
+             nn.LeakyReLU(inplace=True),
+             nn.Conv1d(64, 256, kernel_size=1, stride=1, bias=True),
+        )
+        self.n_soft_classes = 32
+        self.gc = nn.Conv1d(self.n_soft_classes, 256, kernel_size=1, stride=1, bias=False)
+        self.soft_q = soft_torch(classes=self.n_soft_classes, sigma=1, trans=False)
 
         # bert
         self.bert = config.bert
@@ -265,12 +266,13 @@ class GPT(nn.Module):
         if self.use_embd:
             token_embeddings = self.tok_emb(idx.long())
         else:
-            token_embeddings = idx.float().view(b, t)
-            token_embeddings = self.soft_q(idx)
-            token_embeddings = self.gc(token_embeddings)  # 4 x 256 x 1023
+            token_embeddings = idx.float().view(b, t) 
+            token_embeddings = self.soft_q(idx.to('cpu'))
+            token_embeddings = self.gc(token_embeddings.to('cuda'))  # 4 x 256 x 1023
 
             # idx = idx.unsqueeze(-1).view([b, 1, t])  # 4 x 1 x 1023
             # token_embeddings = self.c(idx.float())  # 4 x 1023 * 256
+            
             token_embeddings = token_embeddings.view(b, t, 256)
 
         _b, _t, _d = token_embeddings.size()
@@ -284,7 +286,9 @@ class GPT(nn.Module):
                 ti = ti.view(_t, _d).cpu().numpy()
 
                 ax.imshow(ti, cmap='jet')
+                ax.set_aspect(aspect=255.0/1023.0)
 
+            plt.tight_layout()
             plt.savefig('./embds.png')
             plt.close('all')
 
