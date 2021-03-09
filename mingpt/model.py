@@ -278,14 +278,14 @@ class GPT(nn.Module):
         if plot_embd:
             n_cols = 8
             n_rows = 40 // n_cols
-            fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
+            fig, axis = plt.subplots(n_rows, n_cols, figsize=(32, 16))
             for i, ax in enumerate(axis.ravel()):
                 ti = token_embeddings[i]
                 ti = ti.view(_t, _d).cpu().numpy()
 
                 ax.imshow(ti, cmap='jet')
 
-            plt.savefig('./embds/at_step_{}.png'.format(step))
+            plt.savefig('./embds.png')
             plt.close('all')
 
         x = token_embeddings  # batch x t x n_embeddings

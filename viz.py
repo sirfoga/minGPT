@@ -183,7 +183,7 @@ def sample_some(trainer, model, dataset, X_train, n_samples=40, out_path='./samp
 
     n_cols = 8
     n_rows = n_samples // n_cols
-    fig, axis = plt.subplots(n_rows, n_cols, figsize=(16, 8))
+    fig, axis = plt.subplots(n_rows, n_cols, figsize=(32, 16))
     for i, ax in enumerate(axis.ravel()):
         pxi = pixels[i][iperm]  # undo the encoding permutation
         pxi = pxi.view(pixel_size, pixel_size).cpu().numpy().astype(np.uint8)  # grayscale -> 2D
